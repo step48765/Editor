@@ -9,8 +9,8 @@
 
 
 struct editorConfig{
-	int cols;
-	int rows;
+	int screenrows;
+	int screencols;
 	struct termios orig_attr;
 };
 
@@ -30,9 +30,8 @@ int getWinSize(int *cols, int *rows){
 
 void drawRows(){
 	int y;	
-	getWinSize(&E.cols, &E.rows);
 	
-	for(y = 0; y < E.rows; y++){
+	for(y = 0; y < E.screenrows; y++){
 		write(1, "~\r\n", 3);
 	}
 	
@@ -113,9 +112,19 @@ void editorProcessKeypress() {
 }
 
 
+void initEditor(){
+	if(getWinSize(&E.screencols, &E.screenrows) == -1){
+		refreshScreen();
+   		perror("Init");
+   		exit(1);
+	}
+}
+
+
 int
 main(){	
 	enableRawMode();
+	initEditor();
 	
 	 while (1) {
 	 	refreshScreen();
