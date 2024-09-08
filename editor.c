@@ -17,6 +17,8 @@ struct abuf {
 };
 
 struct editorConfig {
+	int cx;
+	int cy;
     int screenrows;
     int screencols;
     struct termios orig_attr;
@@ -66,12 +68,16 @@ void drawRows(struct abuf *ab) {
 }
 
 void refreshScreen() {
+	char buff[32];
     struct abuf ab = ABUF_INIT;
 
     abAppend(&ab, "\x1b[?25l", 6);  // Hide cursor
     abAppend(&ab, "\x1b[H", 3);     // Move cursor to top left
     drawRows(&ab);                  // Draw rows with tildes and welcome message
-    abAppend(&ab, "\x1b[H", 3);     // Move cursor back to top left
+    
+    snprintf(buff, sizeof(buff), "\x1b[%d;%dH", E.cy + 1, E.cx + 1); //move the cursor to position (y,x)
+    abAppend(&ab, buff, strlen(buff));
+        
     abAppend(&ab, "\x1b[?25h", 6);  // Show cursor
 
     write(1, ab.b, ab.len);         // Write the buffer content to stdout
@@ -149,6 +155,8 @@ int getWinSize(int *cols, int *rows) {
 }
 
 void initEditor() {
+	E.cx = 10;
+	E.cy = 0;
     if (getWinSize(&E.screencols, &E.screenrows) == -1) {
         write(1, "\x1b[2J", 4);
         write(1, "\x1b[H", 3);
