@@ -1,12 +1,18 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <termios.h>
 #include <ctype.h>
 #include <sys/ioctl.h>
 
 #define CTRL_KEY(k) ((k) & 0x1f)
+#define ABUF_INIT {NULL, 0} //macro to init dynamic append buffer function
 
+struct abuf {
+	char *b;
+	int len;
+};
 
 struct editorConfig{
 	int screenrows;
@@ -16,6 +22,20 @@ struct editorConfig{
 
 struct editorConfig E;
 
+
+void abAppend(struct abuf *ab, const char *s, int len){
+	char *new = realloc(ab->b, ab->len + len);
+	if(new == NULL){
+		return;
+	}
+	memcpy(&new[ab->len], s, len);
+	ab->b = new;
+	ab->len += len;
+}
+
+void abfree(struct abuf *ab){
+	free(ab->b);
+}
 
 void drawRows(){
 	int y;	
@@ -41,8 +61,8 @@ void refreshScreen(){
 
 void disableRawMode(){
 	if(tcsetattr(0, TCSAFLUSH, &E.orig_attr) == -1 ){
-		write(STDOUT_FILENO, "\x1b[2J", 4);
-      	write(STDOUT_FILENO, "\x1b[H", 3);
+		write(1, "\x1b[2J", 4);
+      	write(1, "\x1b[H", 3);
       	perror("tcsetattr");		
 		exit(1);	
 	}
@@ -51,8 +71,8 @@ void disableRawMode(){
 void enableRawMode(){
 	
 	if(tcgetattr(0, & E.orig_attr) == -1){
-		write(STDOUT_FILENO, "\x1b[2J", 4);
-      	write(STDOUT_FILENO, "\x1b[H", 3);
+		write(1, "\x1b[2J", 4);
+      	write(1, "\x1b[H", 3);
 		perror("tcgetattr");
 		exit(1);
 	}
@@ -72,8 +92,8 @@ void enableRawMode(){
   	raw.c_cc[VTIME] = 1;
 	
 	if(tcsetattr(0, TCSAFLUSH, &raw) == -1){
-		write(STDOUT_FILENO, "\x1b[2J", 4);
-      	write(STDOUT_FILENO, "\x1b[H", 3);
+		write(1, "\x1b[2J", 4);
+      	write(1, "\x1b[H", 3);
 		perror("tcsetattr raw");
 		exit(1);
 	}
@@ -99,8 +119,8 @@ void editorProcessKeypress() {
 		
 	switch(c){
 		case CTRL_KEY('q'):
-			write(STDOUT_FILENO, "\x1b[2J", 4);
-      		write(STDOUT_FILENO, "\x1b[H", 3);
+			write(1, "\x1b[2J", 4);
+      		write(1, "\x1b[H", 3);
 			exit(0);
 			break;
 	}
@@ -113,7 +133,7 @@ int getCursorPosition(int *rows, int *cols) {
     unsigned int i = 0;
     
     // Send the escape sequence to query cursor position
-    if (write(STDOUT_FILENO, "\x1b[6n", 4) != 4) {
+    if (write(1, "\x1b[6n", 4) != 4) {
         perror("Failed to write escape sequence");
         return -1;
     }
@@ -165,8 +185,8 @@ int getWinSize(int *cols, int *rows){
 	
 void initEditor(){
 	if(getWinSize(&E.screencols, &E.screenrows) == -1){
-		write(STDOUT_FILENO, "\x1b[2J", 4);
-      	write(STDOUT_FILENO, "\x1b[H", 3);
+		write(1, "\x1b[2J", 4);
+      	write(1, "\x1b[H", 3);
    		perror("Init");
    		exit(1);
 	}
