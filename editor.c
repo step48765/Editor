@@ -33,28 +33,31 @@ void abAppend(struct abuf *ab, const char *s, int len){
 	ab->len += len;
 }
 
-void abfree(struct abuf *ab){
+void abFree(struct abuf *ab){
 	free(ab->b);
 }
 
-void drawRows(){
+void drawRows(struct abuf *ab){
 	int y;	
 	
 	for(y = 0; y < E.screenrows; y++){
-		write(1, "~", 1);
+		abAppend(ab, "~", 1);
     	if (y < E.screenrows - 1) {
-    	  write(1, "\r\n", 2);
+    	  abAppend(ab, "\r\n", 2);
     	}
 	}
 }
 
 void refreshScreen(){
-	write(1, "\x1b[2J", 4); //clear screen
-	write(1, "\x1b[H", 3); // move cursor home (top left)
+	struct abuf ab = ABUF_INIT;
+	abAppend(&ab, "\x1b[2J", 4); //clear screen
+	abAppend(&ab, "\x1b[H", 3); // move cursor home (top left)
 	
-	drawRows(); // draw tildas
+	drawRows(&ab); // draw tildas
 	
-	write(1, "\x1b[H", 3); // move cursor home
+	abAppend(&ab, "\x1b[H", 3); // move cursor home
+	write(1, ab.b, ab.len); // write the full buffer out
+	abFree(&ab);
 }
 
 
