@@ -6,209 +6,167 @@
 #include <ctype.h>
 #include <sys/ioctl.h>
 
+#define VERSION "0.0.1"
 #define CTRL_KEY(k) ((k) & 0x1f)
-#define ABUF_INIT {NULL, 0} //macro to init dynamic append buffer function
+#define ABUF_INIT {NULL, 0}  // Macro to initialize dynamic append buffer
 
+// Structures
 struct abuf {
-	char *b;
-	int len;
+    char *b;
+    int len;
 };
 
-struct editorConfig{
-	int screenrows;
-	int screencols;
-	struct termios orig_attr;
+struct editorConfig {
+    int screenrows;
+    int screencols;
+    struct termios orig_attr;
 };
 
 struct editorConfig E;
 
-
-void abAppend(struct abuf *ab, const char *s, int len){
-	char *new = realloc(ab->b, ab->len + len);
-	if(new == NULL){
-		return;
-	}
-	memcpy(&new[ab->len], s, len);
-	ab->b = new;
-	ab->len += len;
+// Buffer Management Functions
+void abAppend(struct abuf *ab, const char *s, int len) {
+    char *new = realloc(ab->b, ab->len + len);
+    if (new == NULL) return;
+    memcpy(&new[ab->len], s, len);
+    ab->b = new;
+    ab->len += len;
 }
 
-void abFree(struct abuf *ab){
-	free(ab->b);
+void abFree(struct abuf *ab) {
+    free(ab->b);
 }
 
-void drawRows(struct abuf *ab){
-	int y;	
-	
-	for(y = 0; y < E.screenrows; y++){
-		abAppend(ab, "~", 1);
-		abAppend(ab, "\x1b[K", 3);
-    	if (y < E.screenrows - 1) {
-    	  abAppend(ab, "\r\n", 2);
-    	}
-	}
+// Screen Drawing Functions
+void drawRows(struct abuf *ab) {
+    int y, welcomelen, padding;
+    char welcome[80];
+
+    for (y = 0; y < E.screenrows; y++) {
+        if (y == E.screenrows / 3) {
+            welcomelen = snprintf(welcome, sizeof(welcome), "Welcome Michael -- version %s", VERSION);
+            if (welcomelen > E.screencols) welcomelen = E.screencols;
+
+            padding = (E.screencols - welcomelen) / 2;
+            if (padding) {
+                abAppend(ab, "~", 1);
+                padding--;
+            }
+            while (padding--) {
+                abAppend(ab, " ", 1);
+            }
+            abAppend(ab, welcome, welcomelen);
+        } else {
+            abAppend(ab, "~", 1);
+        }
+
+        abAppend(ab, "\x1b[K", 3); // Clear the line
+        if (y < E.screenrows - 1) abAppend(ab, "\r\n", 2);
+    }
 }
 
-void refreshScreen(){
-	struct abuf ab = ABUF_INIT;
-	abAppend(&ab, "\x1b[?25l", 6);
-	abAppend(&ab, "\x1b[H", 3); // move cursor home (top left)
-	
-	drawRows(&ab); // draw tildas
-	
-	abAppend(&ab, "\x1b[H", 3); // move cursor home
-	abAppend(&ab, "\x1b[?25h", 6);
-	write(1, ab.b, ab.len); // write the full buffer out
-	abFree(&ab);
+void refreshScreen() {
+    struct abuf ab = ABUF_INIT;
+
+    abAppend(&ab, "\x1b[?25l", 6);  // Hide cursor
+    abAppend(&ab, "\x1b[H", 3);     // Move cursor to top left
+    drawRows(&ab);                  // Draw rows with tildes and welcome message
+    abAppend(&ab, "\x1b[H", 3);     // Move cursor back to top left
+    abAppend(&ab, "\x1b[?25h", 6);  // Show cursor
+
+    write(1, ab.b, ab.len);         // Write the buffer content to stdout
+    abFree(&ab);                    // Free the buffer
 }
 
-
-
-void disableRawMode(){
-	if(tcsetattr(0, TCSAFLUSH, &E.orig_attr) == -1 ){
-		write(1, "\x1b[2J", 4);
-      	write(1, "\x1b[H", 3);
-      	perror("tcsetattr");		
-		exit(1);	
-	}
+// Terminal Mode Management
+void disableRawMode() {
+    if (tcsetattr(0, TCSAFLUSH, &E.orig_attr) == -1) {
+        write(1, "\x1b[2J", 4);
+        write(1, "\x1b[H", 3);
+        perror("tcsetattr");
+        exit(1);
+    }
 }
 
-void enableRawMode(){
-	
-	if(tcgetattr(0, & E.orig_attr) == -1){
-		write(1, "\x1b[2J", 4);
-      	write(1, "\x1b[H", 3);
-		perror("tcgetattr");
-		exit(1);
-	}
-	
-	struct termios raw = E.orig_attr;
-	
-	raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
-	
-  	raw.c_oflag &= ~(OPOST);
-  	
-  	raw.c_cflag |= (CS8);
-  	
-  	raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
-  	
-  	raw.c_cc[VMIN] = 0;
-  	
-  	raw.c_cc[VTIME] = 1;
-	
-	if(tcsetattr(0, TCSAFLUSH, &raw) == -1){
-		write(1, "\x1b[2J", 4);
-      	write(1, "\x1b[H", 3);
-		perror("tcsetattr raw");
-		exit(1);
-	}
+void enableRawMode() {
+    if (tcgetattr(0, &E.orig_attr) == -1) {
+        write(1, "\x1b[2J", 4);
+        write(1, "\x1b[H", 3);
+        perror("tcgetattr");
+        exit(1);
+    }
+
+    struct termios raw = E.orig_attr;
+    raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+    raw.c_oflag &= ~(OPOST);
+    raw.c_cflag |= (CS8);
+    raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
+    raw.c_cc[VMIN] = 0;
+    raw.c_cc[VTIME] = 1;
+
+    if (tcsetattr(0, TCSAFLUSH, &raw) == -1) {
+        write(1, "\x1b[2J", 4);
+        write(1, "\x1b[H", 3);
+        perror("tcsetattr raw");
+        exit(1);
+    }
 }
 
-
+// Input Handling Functions
 char editorReadKey() {
-	char c;
-	c = '\0';
-    if(read(1, &c, 1) == -1){
-   		perror("read");
-   		exit(1);
-   	}
-   	printf("Key read: %c (0x%x)\n", c, c);
+    char c;
+    if (read(1, &c, 1) == -1) {
+        perror("read");
+        exit(1);
+    }
+    printf("Key read: %c (0x%x)\n", c, c);  // Debugging keypress
     return c;
 }
 
 void editorProcessKeypress() {
-	char c;
-	c = editorReadKey();
-	
-	//printf("%d\n\r", c);
-		
-	switch(c){
-		case CTRL_KEY('q'):
-			write(1, "\x1b[2J", 4);
-      		write(1, "\x1b[H", 3);
-			exit(0);
-			break;
-	}
+    char c = editorReadKey();
+    switch (c) {
+        case CTRL_KEY('q'):
+            write(1, "\x1b[2J", 4);  // Clear screen before quitting
+            write(1, "\x1b[H", 3);   // Move cursor home
+            exit(0);
+            break;
+    }
 }
 
-
-/*
-int getCursorPosition(int *rows, int *cols) {
-    char buf[32];
-    unsigned int i = 0;
-    
-    // Send the escape sequence to query cursor position
-    if (write(1, "\x1b[6n", 4) != 4) {
-        perror("Failed to write escape sequence");
-        return -1;
-    }
-    
-    // Read the response from the terminal
-    while (i < sizeof(buf) - 1) {
-        if (read(STDIN_FILENO, &buf[i], 1) != 1) {
-            perror("Failed to read response");
-            return -1;
-        }
-        printf("Read: %c (0x%x)\n", buf[i], buf[i]); // Debug each character
-        if (buf[i] == 'R') break; // End of the response
-        i++;
-    }
-    
-    buf[i] = '\0'; // Null-terminate the response
-    printf("Received sequence: %s\n", buf);  // Debug: Print the whole sequence
-    
-    // Validate the response
-    if (buf[0] != '\x1b' || buf[1] != '[') {
-        return -1;
-    }
-    
-    // Parse the cursor position from the escape sequence
-    if (sscanf(&buf[2], "%d;%d", rows, cols) != 2) {
-        return -1;
-    }
-    
-    return 0;
-}
-
-*/
-	
-	
-
-int getWinSize(int *cols, int *rows){
+// Window Size Functions
+int getWinSize(int *cols, int *rows) {
     struct winsize ws;
-    
-    if(ioctl(1, TIOCGWINSZ, &ws) != -1){
-		*rows = ws.ws_row;
-		*cols = ws.ws_col;
-		editorReadKey();
-		return 0;
-	}else{
-		return -1;
-	}
+
+    if (ioctl(1, TIOCGWINSZ, &ws) != -1) {
+        *rows = ws.ws_row;
+        *cols = ws.ws_col;
+        editorReadKey();  // Read a key after getting window size
+        return 0;
+    } else {
+        return -1;
+    }
 }
 
-	
-void initEditor(){
-	if(getWinSize(&E.screencols, &E.screenrows) == -1){
-		write(1, "\x1b[2J", 4);
-      	write(1, "\x1b[H", 3);
-   		perror("Init");
-   		exit(1);
-	}
+void initEditor() {
+    if (getWinSize(&E.screencols, &E.screenrows) == -1) {
+        write(1, "\x1b[2J", 4);
+        write(1, "\x1b[H", 3);
+        perror("Init");
+        exit(1);
+    }
 }
 
+// Main Loop
+int main() {
+    enableRawMode();
+    initEditor();
 
-int
-main(){	
-	enableRawMode();
-	initEditor();
-	
-	 while (1) {
-	 	refreshScreen();
-    	editorProcessKeypress();
-  	}
-	
-	disableRawMode();	
-	return 0;
+    while (1) {
+        refreshScreen();
+        editorProcessKeypress();
+    }
 
+    disableRawMode();
+    return 0;
 }
