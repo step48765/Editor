@@ -17,6 +17,11 @@ enum editorKey{
   ARROW_DOWN
 };
 
+typedef struct erow{
+    int size;
+    char *chars;
+} erow;
+
 // Structures
 struct abuf {
     char *b;
@@ -28,6 +33,8 @@ struct editorConfig {
 	int cy;
     int screenrows;
     int screencols;
+    int numrows;
+    erow row;
     struct termios orig_attr;
 };
 
@@ -52,23 +59,28 @@ void drawRows(struct abuf *ab) {
     char welcome[80];
 
     for (y = 0; y < E.screenrows; y++) {
-        if (y == E.screenrows / 3) {
-            welcomelen = snprintf(welcome, sizeof(welcome), "Welcome Michael -- version %s", VERSION);
-            if (welcomelen > E.screencols) welcomelen = E.screencols;
+        if(y >= E.numrows){
+            if (y == E.screenrows / 3) {
+                welcomelen = snprintf(welcome, sizeof(welcome), "Welcome Michael -- version %s", VERSION);
+                if (welcomelen > E.screencols) welcomelen = E.screencols;
 
-            padding = (E.screencols - welcomelen) / 2;
-            if (padding) {
-                abAppend(ab, "~", 1);
-                padding--;
-            }
-            while (padding--) {
+                padding = (E.screencols - welcomelen) / 2;
+                if (padding) {
+                    abAppend(ab, "~", 1);
+                    padding--;
+                }
+                while (padding--) {
                 abAppend(ab, " ", 1);
+                }
+                abAppend(ab, welcome, welcomelen);
+            } else {
+                abAppend(ab, "~", 1);
             }
-            abAppend(ab, welcome, welcomelen);
-        } else {
-            abAppend(ab, "~", 1);
+        }else{
+            int len = E.row.size;
+            if(len > E.screencols) len = E.screencols;
+            abAppend(ab, E.row.chars, len);
         }
-
         abAppend(ab, "\x1b[K", 3); // Clear the line
         if (y < E.screenrows - 1) abAppend(ab, "\r\n", 2);
     }
@@ -203,6 +215,17 @@ int getWinSize(int *cols, int *rows) {
     }
 }
 
+void editorOpen(){
+    char *line = "hello, world!";
+    int linelen = 13;
+    
+    E.row.size = linelen;
+    E.row.chars = malloc(linelen + 1);    
+    memcpy(E.row.chars, line, linelen);
+    E.row.chars[linelen] = '\0';
+    E.numrows = 1;
+}
+
 void initEditor() {
 	E.cx = 10;
 	E.cy = 0;
@@ -218,6 +241,7 @@ void initEditor() {
 int main() {
     enableRawMode();
     initEditor();
+    editorOpen();
 
     while (1) {
         refreshScreen();
