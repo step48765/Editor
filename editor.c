@@ -121,13 +121,30 @@ void enableRawMode() {
 // Input Handling Functions
 char editorReadKey() {
     char c;
-    if (read(1, &c, 1) == -1) {
+    while(read(1, &c, 1) == -1) {
         perror("read");
         exit(1);
     }
-    printf("Key read: %c (0x%x)\n", c, c);  // Debugging keypress
     return c;
 }
+
+void moveCursor(char key){
+    switch(key){
+        case 'w':
+            E.cy++;
+            break;
+        case 's':
+            E.cy--;
+            break;
+        case 'a':
+            E.cx--;
+            break;
+        case 'd':
+            E.cx++;
+            break;
+    }
+}
+
 
 void editorProcessKeypress() {
     char c = editorReadKey();
@@ -136,6 +153,12 @@ void editorProcessKeypress() {
             write(1, "\x1b[2J", 4);  // Clear screen before quitting
             write(1, "\x1b[H", 3);   // Move cursor home
             exit(0);
+            break;
+        case 'w':
+        case 's':  
+        case 'a':
+        case 'd':
+            moveCursor(c);
             break;
     }
 }
