@@ -5,6 +5,7 @@
 #include <termios.h>
 #include <ctype.h>
 #include <sys/ioctl.h>
+#include <sys/types.h>
 
 #define VERSION "0.0.1"
 #define CTRL_KEY(k) ((k) & 0x1f)
@@ -55,37 +56,36 @@ void abFree(struct abuf *ab) {
 
 // Screen Drawing Functions
 void drawRows(struct abuf *ab) {
-    int y, welcomelen, padding;
-    char welcome[80];
-
-    for (y = 0; y < E.screenrows; y++) {
-        if(y >= E.numrows){
-            if (y == E.screenrows / 3) {
-                welcomelen = snprintf(welcome, sizeof(welcome), "Welcome Michael -- version %s", VERSION);
-                if (welcomelen > E.screencols) welcomelen = E.screencols;
-
-                padding = (E.screencols - welcomelen) / 2;
-                if (padding) {
-                    abAppend(ab, "~", 1);
-                    padding--;
-                }
-                while (padding--) {
-                abAppend(ab, " ", 1);
-                }
-                abAppend(ab, welcome, welcomelen);
-            } else {
-                abAppend(ab, "~", 1);
-            }
-        }else{
-            int len = E.row.size;
-            if(len > E.screencols) len = E.screencols;
-            abAppend(ab, E.row.chars, len);
+  int y;
+  for (y = 0; y < E.screenrows; y++) {
+    if (y >= E.numrows) {
+      if (E.numrows == 0 && y == E.screenrows / 3) {
+        char welcome[80];
+        int welcomelen = snprintf(welcome, sizeof(welcome),
+          "Welcome Michael -- version %s", VERSION);
+        if (welcomelen > E.screencols) welcomelen = E.screencols;
+        int padding = (E.screencols - welcomelen) / 2;
+        if (padding) {
+          abAppend(ab, "~", 1);
+          padding--;
         }
-        abAppend(ab, "\x1b[K", 3); // Clear the line
-        if (y < E.screenrows - 1) abAppend(ab, "\r\n", 2);
+        while (padding--) abAppend(ab, " ", 1);
+        abAppend(ab, welcome, welcomelen);
+      } else {
+        abAppend(ab, "~", 1);
+      }
+    } else {
+      int len = E.row.size;
+      if (len > E.screencols) len = E.screencols;
+      abAppend(ab, E.row.chars, len);
     }
+    abAppend(ab, "\x1b[K", 3);
+    if (y < E.screenrows - 1) {
+      abAppend(ab, "\r\n", 2);
+    }
+  }
 }
-
+//"Welcome Michael -- version %s", VERSION
 void refreshScreen() {
 	char buff[32];
     struct abuf ab = ABUF_INIT;
@@ -215,15 +215,28 @@ int getWinSize(int *cols, int *rows) {
     }
 }
 
-void editorOpen(){
-    char *line = "hello, world!";
-    int linelen = 13;
-    
+void editorOpen(char *filename) {
+  FILE *fp = fopen(filename, "r");
+  if (!fp){
+      perror("fopen");
+      exit(1);
+  }
+  char *line = NULL;
+  size_t linecap = 0;
+  ssize_t linelen;
+  linelen = getline(&line, &linecap, fp);
+  if (linelen != -1) {
+    while (linelen > 0 && (line[linelen - 1] == '\n' ||
+                           line[linelen - 1] == '\r'))
+      linelen--;
     E.row.size = linelen;
-    E.row.chars = malloc(linelen + 1);    
+    E.row.chars = malloc(linelen + 1);
     memcpy(E.row.chars, line, linelen);
     E.row.chars[linelen] = '\0';
     E.numrows = 1;
+  }
+  free(line);
+  fclose(fp);
 }
 
 void initEditor() {
@@ -238,10 +251,13 @@ void initEditor() {
 }
 
 // Main Loop
-int main() {
+int main(int argc, char *argv[]) {
     enableRawMode();
     initEditor();
-    editorOpen();
+    
+    if(argc > 2){
+        editorOpen(argv[1]);
+    }
 
     while (1) {
         refreshScreen();
