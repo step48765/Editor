@@ -10,6 +10,13 @@
 #define CTRL_KEY(k) ((k) & 0x1f)
 #define ABUF_INIT {NULL, 0}  // Macro to initialize dynamic append buffer
 
+enum editorKey{
+  ARROW_LEFT = 1000,
+  ARROW_RIGHT,
+  ARROW_UP,
+  ARROW_DOWN
+};
+
 // Structures
 struct abuf {
     char *b;
@@ -119,45 +126,64 @@ void enableRawMode() {
 }
 
 // Input Handling Functions
-char editorReadKey() {
+int editorReadKey() {
     char c;
-    while(read(1, &c, 1) == -1) {
+    char seq[3];
+    while(read(0, &c, 1) == -1) { //use while so that it keeps trying to read from stdin till it gets an == 1
         perror("read");
         exit(1);
     }
-    return c;
+    if( c == '\x1b'){
+        if(read(0, &seq[0], 1) != 1) return '\x1b';
+        if(read(0, &seq[1], 1) != 1) return '\x1b';
+        
+        if(seq[0] == '['){
+            switch(seq[1]){
+                case 'A': return ARROW_UP;
+                case 'B': return ARROW_DOWN;
+                case 'C': return ARROW_RIGHT;
+                case 'D': return ARROW_LEFT;
+                default: return '\x1b';
+            }
+        }
+        else{
+            return '\x1b';   
+        }
+    }else{
+        return c;
+    }
 }
 
-void moveCursor(char key){
+void moveCursor(int key){
     switch(key){
-        case 'w':
-            E.cy++;
-            break;
-        case 's':
+        case ARROW_UP:
             E.cy--;
             break;
-        case 'a':
-            E.cx--;
+        case ARROW_DOWN:
+            E.cy++;
             break;
-        case 'd':
+        case ARROW_RIGHT:
             E.cx++;
+            break;
+        case ARROW_LEFT:
+            E.cx--;
             break;
     }
 }
 
 
 void editorProcessKeypress() {
-    char c = editorReadKey();
+    int c = editorReadKey();
     switch (c) {
         case CTRL_KEY('q'):
             write(1, "\x1b[2J", 4);  // Clear screen before quitting
             write(1, "\x1b[H", 3);   // Move cursor home
             exit(0);
             break;
-        case 'w':
-        case 's':  
-        case 'a':
-        case 'd':
+        case ARROW_UP:
+        case ARROW_DOWN:  
+        case ARROW_LEFT:
+        case ARROW_RIGHT:
             moveCursor(c);
             break;
     }
