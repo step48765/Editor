@@ -99,21 +99,17 @@ void drawRows(struct abuf *ab) {
 }
 //"Welcome Michael -- version %s", VERSION
 void refreshScreen() {
-    editorScroll();
-	char buff[32];
-    struct abuf ab = ABUF_INIT;
-
-    abAppend(&ab, "\x1b[?25l", 6);  // Hide cursor
-    abAppend(&ab, "\x1b[H", 3);     // Move cursor to top left
-    drawRows(&ab);                  // Draw rows with tildes and welcome message
-    
-    snprintf(buff, sizeof(buff), "\x1b[%d;%dH", E.cy + 1, E.cx + 1); //move the cursor to position (y,x)
-    abAppend(&ab, buff, strlen(buff));
-        
-    abAppend(&ab, "\x1b[?25h", 6);  // Show cursor
-
-    write(1, ab.b, ab.len);         // Write the buffer content to stdout
-    abFree(&ab);                    // Free the buffer
+  editorScroll();
+  struct abuf ab = ABUF_INIT;
+  abAppend(&ab, "\x1b[?25l", 6);
+  abAppend(&ab, "\x1b[H", 3);
+  drawRows(&ab);
+  char buf[32];
+  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (E.cy - E.rowoff) + 1, E.cx + 1);
+  abAppend(&ab, buf, strlen(buf));
+  abAppend(&ab, "\x1b[?25h", 6);
+  write(STDOUT_FILENO, ab.b, ab.len);
+  abFree(&ab);                   // Free the buffer
 }
 
 // Terminal Mode Management
