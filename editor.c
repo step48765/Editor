@@ -80,6 +80,7 @@ void editorOpen(char *filename);
 void initEditor();
 void editorUpdateRow(erow *row);
 int editorRowCxToRx(erow *row, int cx);
+void editorSave();
 
 // Buffer Management Functions
 void abAppend(struct abuf *ab, const char *s, int len) {
@@ -330,12 +331,21 @@ void editorProcessKeypress() {
             write(1, "\x1b[H", 3);   // Move cursor home
             exit(0);
             break;
+            
+        case CTRL_KEY('s'):
+            editorSave();
+            break;
         case ARROW_UP:
         case ARROW_DOWN:
         case ARROW_LEFT:
         case ARROW_RIGHT:
             moveCursor(c);
             break;
+        
+        case CTRL_KEY('l'):
+        case '\x1b':
+             break;
+        
         default:
             editorInsertChar(c);
             break;
@@ -419,6 +429,25 @@ int editorRowCxToRx(erow *row, int cx) {
     return rx;
 }
 
+
+char *editorRowsToString(int *buflen) {
+  int totlen = 0;
+  int j;
+  for (j = 0; j < E.numrows; j++)
+    totlen += E.row[j].size + 1;
+  *buflen = totlen;
+  char *buf = malloc(totlen);
+  char *p = buf;
+  for (j = 0; j < E.numrows; j++) {
+    memcpy(p, E.row[j].chars, E.row[j].size);
+    p += E.row[j].size;
+    *p = '\n';
+    p++;
+  }
+  return buf;
+}
+
+
 void editorOpen(char *filename) {
     free(E.filename);
     E.filename = strdup(filename);
@@ -438,6 +467,25 @@ void editorOpen(char *filename) {
     free(line);
     fclose(fp);
 }
+
+
+void editorSave() {
+    if (E.filename == NULL) return;
+
+    int len;
+    char *buf = editorRowsToString(&len);
+
+    FILE *fp = fopen(E.filename, "w");
+    if (fp == NULL) {
+        free(buf);
+        return;
+    }
+
+    fwrite(buf, 1, len, fp);
+    fclose(fp);
+    free(buf);
+}
+
 
 void initEditor() {
     E.cx = 0;
