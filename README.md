@@ -1,7 +1,7 @@
 
-# Terminal-Based Text Editor
+# NBS_Editor (No BullShit Editor)
 
-This is a simple terminal-based text editor written in C. It allows you to open a file, edit its content, and save changes. The editor supports basic text manipulation and navigation commands, all controlled from the terminal.
+NBS_Editor is a simple terminal-based text editor with no bells and whistles. It's designed to give you a straightforward text-editing experience without the extra features that modern editors often include. Just open a file, edit it, save, and quit—nothing more, nothing less.
 
 ## How to Use
 
@@ -12,13 +12,13 @@ To compile the editor, simply use the `make` command in the project directory:
 make
 ```
 
-This will compile all the source files and create an executable named `editor`.
+This will compile all the source files and create an executable named `NBS_Editor`.
 
 ### 2. Running the Editor
-To open a file in the editor, run the following command:
+To open a file in NBS_Editor, run the following command:
 
 ```
-./editor <filename>
+./NBS_Editor <filename>
 ```
 
 - If the `<filename>` exists, the editor will open it for editing.
@@ -54,10 +54,10 @@ The project consists of the following files:
 To edit a file called `example.txt`:
 
 ```
-./editor example.txt
+./NBS_Editor example.txt
 ```
 
 Edit the content, and when finished, press `CTRL + S` to save and `CTRL + Q` to quit.
 
 ## Notes
-- The editor is basic and intended as a learning project for terminal-based text editing. It does not support advanced features like syntax highlighting or search functionality.
+- NBS_Editor is designed to be a no-nonsense, simple text editor. It doesn't include extra features like syntax highlighting or search functionality—just the basics.
