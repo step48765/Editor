@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c99 -pedantic
-TARGET = editor
+TARGET = NBS_Editor
 OBJS = editor.o input.o row.o screen.o buffer.o utils.o terminal.o
 
 all: $(TARGET)
